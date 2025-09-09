@@ -1,0 +1,492 @@
+{% extends 'base.html' %}
+
+{% block title %}Transaksi Penjualan{% endblock %}
+
+{% block head %}
+{{ super() }}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<style>
+    .modal {
+        transition: opacity 0.25s ease;
+    }
+    .modal-active {
+        visibility: visible;
+    }
+    .modal-content {
+        transform: translateY(-20%);
+        transition: transform 0.25s ease;
+    }
+    .modal-active .modal-content {
+        transform: translateY(0);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="bg-white p-6 md:p-8 rounded-lg shadow-xl w-full max-w-5xl mx-auto">
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
+        <h2 class="text-2xl md:text-3xl font-bold text-gray-800 mb-4 md:mb-0">Catat Transaksi Penjualan 🛍️</h2>
+        <a href="{{ url_for('index') }}" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-gray-600 hover:bg-gray-700">
+            ⬅️ Kembali ke Dashboard
+        </a>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <ul class="mb-4 space-y-2">
+            {% for category, message in messages %}
+                <li class="px-4 py-3 rounded relative text-sm {% if category == 'error' %}bg-red-100 border border-red-400 text-red-700{% elif category == 'success' %}bg-green-100 border border-green-400 text-green-700{% endif %}" role="alert">
+                    {{ message }}
+                </li>
+            {% endfor %}
+            </ul>
+        {% endif %}
+    {% endwith %}
+
+    <form id="transaksiForm" method="post" action="{{ url_for('transaksi.transaksi') }}" enctype="multipart/form-data">
+        <h3 class="text-xl font-semibold text-gray-700 mb-4">Informasi Pelanggan</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+                <label for="nama_pelanggan" class="block text-sm font-medium text-gray-700">Nama Pelanggan (Opsional)</label>
+                <input type="text" id="nama_pelanggan" name="nama_pelanggan" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+            </div>
+            <div>
+                <label for="tgl_kirim" class="block text-sm font-medium text-gray-700">Tanggal Kirim</label>
+                <input type="date" id="tgl_kirim" name="tgl_kirim" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+            </div>
+            <div class="col-span-1 md:col-span-2">
+                <label for="alamat" class="block text-sm font-medium text-gray-700">Alamat</label>
+                <textarea id="alamat" name="alamat" rows="2" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"></textarea>
+            </div>
+        </div>
+        
+        <h3 class="text-xl font-semibold text-gray-700 mb-4">Keranjang Belanja</h3>
+        <div class="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-4">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                <div>
+                    <label for="pilih_produk" class="block text-sm font-medium text-gray-700">Pilih Produk</label>
+                    <select id="pilih_produk" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                        <option value="">-- Pilih Produk --</option>
+                        {% for gas in gas_list %}
+                            <option value="{{ gas.id }}" data-harga="{{ gas.harga }}" data-jenis="{{ gas.jenis_gas }}" data-stok="{{ gas.stok }}">{{ gas.jenis_gas }} (Stok: {{ gas.stok }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label for="item_jumlah" class="block text-sm font-medium text-gray-700">Jumlah Jual</label>
+                    <input type="number" id="item_jumlah" min="1" value="1" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                </div>
+                <div>
+                    <label for="item_harga" class="block text-sm font-medium text-gray-700">Harga Jual (Rp)</label>
+                    <input type="number" id="item_harga" step="1000" min="0" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                </div>
+                <button type="button" id="tambahItemBtn" class="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700">
+                    <i class="bi bi-plus"></i> Tambah Item
+                </button>
+            </div>
+        </div>
+
+        <div class="mb-4">
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-100">
+                        <tr>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Produk</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Jumlah</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Harga</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
+                            <th class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="keranjangTableBody" class="bg-white divide-y divide-gray-200">
+                        </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="col-span-1 md:col-span-2 p-4 bg-blue-100 rounded-md font-semibold text-blue-800 flex justify-between">
+                <span>Total Keseluruhan:</span>
+                <span id="totalHarga">Rp 0</span>
+            </div>
+            <div>
+                <label for="jumlah_bayar" class="block text-sm font-medium text-gray-700">Jumlah Bayar (Rp)</label>
+                <input type="number" id="jumlah_bayar" name="jumlah_bayar" step="1000" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+            </div>
+            <div class="p-4 bg-green-100 rounded-md font-semibold text-green-800 flex justify-between">
+                <span>Kembalian:</span>
+                <span id="kembalian">Rp 0</span>
+            </div>
+        </div>
+
+        <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label for="foto" class="block text-sm font-medium text-gray-700">Foto (Opsional)</label>
+                <input type="file" id="foto" name="foto" accept="image/*" class="mt-1 block w-full text-sm text-gray-500">
+            </div>
+            <div>
+                <label for="video" class="block text-sm font-medium text-gray-700">Video (Opsional)</label>
+                <input type="file" id="video" name="video" accept="video/*" class="mt-1 block w-full text-sm text-gray-500">
+            </div>
+        </div>
+        
+        <input type="hidden" name="keranjang_data" id="keranjangData">
+
+        <button type="button" id="catatTransaksiBtn" class="mt-6 w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700">
+            Catat Transaksi
+        </button>
+    </form>
+    
+    <hr class="my-8 border-t border-gray-200">
+    
+    <h3 class="text-xl md:text-2xl font-semibold text-gray-700 mb-4">Riwayat Transaksi</h3>
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tanggal</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pelanggan</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Produk</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Harga</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {% for transaksi in transaksi_list %}
+                <tr>
+                    <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{{ transaksi.tanggal_transaksi.strftime("%d-%m-%Y %H:%M") if transaksi.tanggal_transaksi else '' }}</td>
+                    <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{{ transaksi.nama_pelanggan or '-' }}</td>
+                    <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{{ transaksi.jenis_gas }} ({{ transaksi.jumlah_jual }} buah)</td>
+                    <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900">Rp {{ "{:,.0f}".format(transaksi.total_harga).replace(",", ".") }}</td>
+                    <td class="px-4 py-2 whitespace-nowrap text-sm font-medium space-x-2">
+                        <button type="button" onclick="cetakStrukRiwayat('{{ transaksi.nama_pelanggan | escape }}', '{{ transaksi.tanggal_transaksi.strftime('%Y-%m-%d %H:%M') | escape }}', {{ transaksi.item_json | tojson | escape }})" class="text-blue-600 hover:text-blue-900">
+                            <i class="bi bi-printer"></i>
+                        </button>
+                        <form action="{{ url_for('transaksi.hapus_transaksi', transaksi_id=transaksi.id) }}" method="post" onsubmit="return confirm('Apakah Anda yakin ingin menghapus transaksi ini? Stok akan dikembalikan.');" class="inline">
+                            <button type="submit" class="text-red-600 hover:text-red-900">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="px-4 py-4 text-center text-sm text-gray-500">Tidak ada riwayat transaksi.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div id="strukModal" class="modal fixed inset-0 z-50 overflow-auto bg-gray-900 bg-opacity-50 flex items-center justify-center hidden">
+    <div class="modal-content bg-white p-6 rounded-lg shadow-xl w-full max-w-sm mx-4">
+        <h4 class="text-lg font-bold text-center mb-4">Struk Pembayaran</h4>
+        <div id="strukContent" class="text-sm">
+            </div>
+        <div class="mt-6 flex justify-end space-x-2">
+            <button id="batalCetakBtn" type="button" class="py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">Batal</button>
+            <button id="cetakBtn" type="button" class="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700">Cetak Struk</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Fungsi untuk format angka
+    const formatRupiah = (number) => {
+        return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(number);
+    };
+
+    // Fungsi untuk membuat nomor acak 6 digit
+    const generateRandomNumber = () => {
+        return Math.floor(100000 + Math.random() * 900000);
+    };
+
+    // Fungsi untuk mencetak struk dari riwayat
+    function cetakStrukRiwayat(nama, tanggal, itemsJson) {
+        const items = JSON.parse(itemsJson);
+        const totalHarga = items.reduce((sum, item) => sum + (item.jumlah * item.harga), 0);
+        
+        const strukContent = `
+            <style>
+                body { font-family: 'Arial', sans-serif; font-size: 14px; margin: 0; padding: 20px; }
+                .struk-container { width: 300px; margin: 0 auto; text-align: center; }
+                .header { font-size: 18px; font-weight: bold; margin-bottom: 10px; }
+                .detail { text-align: left; margin-bottom: 15px; }
+                .detail p { margin: 5px 0; }
+                .footer { margin-top: 20px; font-size: 12px; }
+                @media print {
+                    body { font-size: 12px; }
+                    .struk-container { width: 100%; }
+                }
+            </style>
+            <div class="struk-container">
+                <div class="header">PANGKALAN GAS ELPIJI KHAERUNNISA</div>
+                <hr style="border: 1px dashed black; margin: 10px 0;">
+                <div class="detail">
+                    <p><strong>Tanggal:</strong> ${new Date(tanggal).toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+                    <p><strong>Pelanggan:</strong> ${nama || '-'}</p>
+                    <p class="mt-2 font-semibold">Produk:</p>
+                    <div class="pl-4">
+                        ${items.map(item => `<p>${item.jenis} (${item.jumlah} buah) - ${formatRupiah(item.harga)}</p>`).join('')}
+                    </div>
+                    <hr style="border: 1px dashed black; margin: 10px 0;">
+                    <p><strong>Total:</strong> ${formatRupiah(totalHarga)}</p>
+                </div>
+                <div class="footer">
+                    <p>Terima kasih telah berbelanja!</p>
+                </div>
+            </div>
+        `;
+
+        const printWindow = window.open('', '', 'width=400,height=600');
+        printWindow.document.open();
+        printWindow.document.write(strukContent);
+        printWindow.document.close();
+        printWindow.print();
+    }
+    
+    document.addEventListener('DOMContentLoaded', function () {
+        // PERUBAHAN DI SINI: PRE-FILL TANGGAL HARI INI
+        const tglKirimInput = document.getElementById('tgl_kirim');
+        const today = new Date();
+        const yyyy = today.getFullYear();
+        const mm = String(today.getMonth() + 1).padStart(2, '0'); // Months are 0-based
+        const dd = String(today.getDate()).padStart(2, '0');
+        tglKirimInput.value = `${yyyy}-${mm}-${dd}`;
+    
+        const pilihProdukSelect = document.getElementById('pilih_produk');
+        const itemJumlahInput = document.getElementById('item_jumlah');
+        const itemHargaInput = document.getElementById('item_harga');
+        const tambahItemBtn = document.getElementById('tambahItemBtn');
+        const keranjangTableBody = document.getElementById('keranjangTableBody');
+        const totalHargaSpan = document.getElementById('totalHarga');
+        const jumlahBayarInput = document.getElementById('jumlah_bayar');
+        const kembalianSpan = document.getElementById('kembalian');
+        const transaksiForm = document.getElementById('transaksiForm');
+        const catatTransaksiBtn = document.getElementById('catatTransaksiBtn');
+        const namaPelangganInput = document.getElementById('nama_pelanggan');
+        const keranjangDataInput = document.getElementById('keranjangData');
+        const strukModal = document.getElementById('strukModal');
+        const cetakBtnModal = document.getElementById('cetakBtn');
+        const batalCetakBtnModal = document.getElementById('batalCetakBtn');
+        
+        let keranjang = [];
+
+        const updateTotals = () => {
+            const grandTotal = keranjang.reduce((sum, item) => sum + (item.jumlah * item.harga), 0);
+            totalHargaSpan.textContent = formatRupiah(grandTotal);
+            
+            const jumlahBayar = parseFloat(jumlahBayarInput.value) || 0;
+            const kembalian = jumlahBayar - grandTotal;
+            kembalianSpan.textContent = formatRupiah(kembalian);
+        };
+
+        const renderKeranjang = () => {
+            keranjangTableBody.innerHTML = '';
+            if (keranjang.length === 0) {
+                keranjangTableBody.innerHTML = `<tr><td colspan="5" class="text-center text-gray-500 py-4">Keranjang kosong.</td></tr>`;
+            } else {
+                keranjang.forEach((item, index) => {
+                    const totalItem = item.jumlah * item.harga;
+                    const row = `
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-4 py-2 text-sm text-gray-900">${item.jenis}</td>
+                            <td class="px-4 py-2 text-sm text-gray-900">${item.jumlah}</td>
+                            <td class="px-4 py-2 text-sm text-gray-900">${formatRupiah(item.harga)}</td>
+                            <td class="px-4 py-2 text-sm text-gray-900">${formatRupiah(totalItem)}</td>
+                            <td class="px-4 py-2 text-center text-sm">
+                                <button type="button" onclick="removeItem(${index})" class="text-red-600 hover:text-red-800">
+                                    <i class="bi bi-x-circle"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                    keranjangTableBody.insertAdjacentHTML('beforeend', row);
+                });
+            }
+        };
+
+        window.removeItem = (index) => {
+            keranjang.splice(index, 1);
+            renderKeranjang();
+            updateTotals();
+        };
+
+        pilihProdukSelect.addEventListener('change', () => {
+            const selectedOption = pilihProdukSelect.options[pilihProdukSelect.selectedIndex];
+            if (selectedOption.dataset.harga) {
+                itemHargaInput.value = selectedOption.dataset.harga;
+                itemJumlahInput.value = 1;
+            }
+        });
+
+        tambahItemBtn.addEventListener('click', () => {
+            const selectedOption = pilihProdukSelect.options[pilihProdukSelect.selectedIndex];
+            if (!selectedOption.value) {
+                alert('Pilih produk terlebih dahulu.');
+                return;
+            }
+            
+            const produkId = selectedOption.value;
+            const jenisProduk = selectedOption.dataset.jenis;
+            const harga = parseFloat(itemHargaInput.value);
+            const jumlah = parseInt(itemJumlahInput.value);
+            const stok = parseInt(selectedOption.dataset.stok);
+
+            if (jumlah <= 0 || isNaN(jumlah)) {
+                alert('Jumlah jual harus lebih dari 0.');
+                return;
+            }
+
+            if (jumlah > stok) {
+                alert(`Stok ${jenisProduk} tidak mencukupi. Sisa stok: ${stok}`);
+                return;
+            }
+
+            const existingItem = keranjang.find(item => item.id === produkId);
+            if (existingItem) {
+                if (existingItem.jumlah + jumlah > stok) {
+                    alert(`Penambahan jumlah akan melebihi stok yang tersedia.`);
+                    return;
+                }
+                existingItem.jumlah += jumlah;
+                existingItem.harga = harga;
+            } else {
+                keranjang.push({
+                    id: produkId,
+                    jenis: jenisProduk,
+                    jumlah: jumlah,
+                    harga: harga
+                });
+            }
+            
+            renderKeranjang();
+            updateTotals();
+        });
+
+        jumlahBayarInput.addEventListener('input', updateTotals);
+
+        // Aksi saat tombol "Catat Transaksi" ditekan
+        catatTransaksiBtn.addEventListener('click', () => {
+            if (keranjang.length === 0) {
+                alert('Keranjang belanja tidak boleh kosong!');
+                return;
+            }
+
+            const grandTotal = keranjang.reduce((sum, item) => sum + (item.jumlah * item.harga), 0);
+            const jumlahBayar = parseFloat(jumlahBayarInput.value) || 0;
+
+            if (jumlahBayar < grandTotal) {
+                alert('Jumlah bayar tidak boleh kurang dari total harga!');
+                return;
+            }
+            
+            // Tampilkan modal struk
+            let namaPelanggan = namaPelangganInput.value;
+            if (!namaPelanggan) {
+                namaPelanggan = `Nomor Acak: ${generateRandomNumber()}`;
+            }
+
+            const strukContent = document.getElementById('strukContent');
+            let itemsHtml = '';
+            keranjang.forEach(item => {
+                itemsHtml += `<p class="flex justify-between"><span>${item.jenis} (${item.jumlah} buah)</span> <span>${formatRupiah(item.harga)}</span></p>`;
+            });
+
+            const content = `
+                <p><strong>Pelanggan:</strong> ${namaPelanggan}</p>
+                <p class="mt-2 font-semibold">Produk:</p>
+                <div class="pl-4">
+                    ${itemsHtml}
+                </div>
+                <hr class="my-2 border-t border-dashed">
+                <p class="flex justify-between font-bold text-base"><span>Total:</span> <span>${formatRupiah(grandTotal)}</span></p>
+                <p class="flex justify-between text-sm"><span>Jumlah Bayar:</span> <span>${formatRupiah(jumlahBayar)}</span></p>
+                <p class="flex justify-between text-sm"><span>Kembalian:</span> <span>${formatRupiah(jumlahBayar - grandTotal)}</span></p>
+            `;
+            
+            strukContent.innerHTML = content;
+            strukModal.classList.add('modal-active');
+            strukModal.style.display = 'flex';
+        });
+
+        // Aksi saat tombol "Batal" di modal ditekan
+        batalCetakBtnModal.addEventListener('click', () => {
+            strukModal.classList.remove('modal-active');
+            strukModal.style.display = 'none';
+        });
+
+        // Aksi saat tombol "Cetak Struk" di modal ditekan
+        cetakBtnModal.addEventListener('click', () => {
+            const grandTotal = keranjang.reduce((sum, item) => sum + (item.jumlah * item.harga), 0);
+            const jumlahBayar = parseFloat(jumlahBayarInput.value) || 0;
+            let namaPelanggan = namaPelangganInput.value;
+            
+            if (!namaPelanggan) {
+                namaPelanggan = `Nomor Acak: ${generateRandomNumber()}`;
+                namaPelangganInput.value = namaPelanggan; // Set value untuk dikirim ke server
+            }
+
+            // Simpan data keranjang ke hidden input
+            keranjangDataInput.value = JSON.stringify(keranjang);
+            
+            // Mengirim form ke server
+            transaksiForm.submit();
+
+            // Sembunyikan modal setelah submit
+            strukModal.classList.remove('modal-active');
+            strukModal.style.display = 'none';
+            
+            // Tampilkan jendela cetak
+            const printWindow = window.open('', '', 'width=400,height=600');
+            printWindow.document.write(`
+                <html>
+                <head>
+                    <title>Struk Pembayaran</title>
+                    <style>
+                        body { font-family: 'Arial', sans-serif; font-size: 14px; margin: 0; padding: 20px; }
+                        .struk-container { width: 300px; margin: 0 auto; text-align: center; }
+                        .header { font-size: 18px; font-weight: bold; margin-bottom: 10px; }
+                        .detail { text-align: left; margin-bottom: 15px; }
+                        .detail p { margin: 5px 0; }
+                        .footer { margin-top: 20px; font-size: 12px; }
+                        @media print {
+                            body { font-size: 12px; }
+                            .struk-container { width: 100%; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="struk-container">
+                        <div class="header">PANGKALAN GAS ELPIJI KHAERUNNISA</div>
+                        <hr style="border: 1px dashed black; margin: 10px 0;">
+                        <div class="detail">
+                            <p><strong>Tanggal:</strong> ${new Date().toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+                            <p><strong>Pelanggan:</strong> ${namaPelanggan}</p>
+                            <p class="mt-2 font-semibold">Produk:</p>
+                            <div class="pl-4">
+                                ${keranjang.map(item => `<p>${item.jenis} (${item.jumlah} buah) - ${formatRupiah(item.harga)}</p>`).join('')}
+                            </div>
+                            <hr style="border: 1px dashed black; margin: 10px 0;">
+                            <p><strong>Total:</strong> ${formatRupiah(grandTotal)}</p>
+                            <p><strong>Jumlah Bayar:</strong> ${formatRupiah(jumlahBayar)}</p>
+                            <p><strong>Kembalian:</strong> ${formatRupiah(jumlahBayar - grandTotal)}</p>
+                        </div>
+                        <div class="footer">
+                            <p>Terima kasih telah berbelanja!</p>
+                        </div>
+                    </div>
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
+            printWindow.print();
+        });
+
+        // Initial render
+        renderKeranjang();
+        updateTotals();
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,298 @@
+{% extends "base.html" %}
+
+{% block head %}
+{{ super() }}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto p-6">
+    <div class="flex items-center justify-between mb-6">
+        <h2 class="text-3xl font-bold text-gray-800">📦 Cek Penjualan</h2>
+        <a href="{{ url_for('index') }}" 
+           class="bg-gray-600 hover:bg-gray-700 text-white px-5 py-2 rounded-lg shadow">
+           ⬅️ Kembali ke Dashboard
+        </a>
+    </div>
+
+    <div class="bg-white shadow-xl rounded-xl p-4 mb-8">
+        <form id="barcodeForm" onsubmit="event.preventDefault(); fetchProductDetails();">
+            <div class="relative">
+                <input type="text" name="barcode" id="barcodeInput"
+                       placeholder="Scan atau masukkan kode barcode"
+                       class="w-full text-lg px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-300">
+                <button type="button" onclick="openScanner()" 
+                        class="absolute inset-y-0 right-0 flex items-center px-4 text-blue-600 hover:text-blue-800 focus:outline-none">
+                    <i class="bi bi-qr-code-scan text-2xl"></i>
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <div class="bg-white shadow-lg rounded-xl p-6 border border-gray-200">
+        <h3 class="text-xl font-semibold text-gray-700 mb-4">📑 Riwayat Transaksi</h3>
+        {% if transaksi_list %}
+            <div class="overflow-x-auto">
+                <table class="w-full border-collapse rounded-lg overflow-hidden shadow-sm">
+                    <thead class="bg-gradient-to-r from-blue-500 to-blue-600 text-white">
+                        <tr>
+                            <th class="px-4 py-2 text-left">Tanggal</th>
+                            <th class="px-4 py-2 text-left">Nama Pelanggan</th>
+                            <th class="px-4 py-2 text-left">Alamat</th>
+                            <th class="px-4 py-2 text-left">Jenis Gas</th>
+                            <th class="px-4 py-2 text-center">Jumlah</th>
+                            <th class="px-4 py-2 text-right">Harga Satuan</th>
+                            <th class="px-4 py-2 text-right">Total</th>
+                            <th class="px-4 py-2 text-left">Tgl Kirim</th>
+                            <th class="px-4 py-2 text-center">Foto</th>
+                            <th class="px-4 py-2 text-center">Video</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for trx in transaksi_list %}
+                        <tr class="odd:bg-gray-50 hover:bg-gray-100 transition">
+                            <td class="px-4 py-2">{{ trx.tanggal_transaksi.strftime("%d-%m-%Y %H:%M") if trx.tanggal_transaksi else '' }}</td>
+                            <td class="px-4 py-2">{{ trx.nama_pelanggan }}</td>
+                            <td class="px-4 py-2">{{ trx.alamat }}</td>
+                            <td class="px-4 py-2">{{ trx.jenis_gas }}</td>
+                            <td class="px-4 py-2 text-center">{{ trx.jumlah_jual }} buah</td>
+                            <td class="px-4 py-2 text-right">Rp {{ "{:,.0f}".format(trx.harga_satuan).replace(",", ".") }}</td>
+                            <td class="px-4 py-2 text-right">Rp {{ "{:,.0f}".format(trx.total_harga).replace(",", ".") }}</td>
+                            <td class="px-4 py-2">{{ trx.tgl_kirim if trx.tgl_kirim else '-' }}</td>
+                            <td class="px-4 py-2 text-center">
+                                {% if trx.foto %}
+                                    <img src="{{ url_for('static', filename='uploads/' ~ trx.foto) }}" 
+                                         class="w-16 h-16 object-cover rounded-lg shadow">
+                                {% else %}-{% endif %}
+                            </td>
+                            <td class="px-4 py-2 text-center">
+                                {% if trx.video %}
+                                    <video width="120" class="rounded-lg shadow" controls>
+                                        <source src="{{ url_for('static', filename='uploads/' ~ trx.video) }}" type="video/mp4">
+                                    </video>
+                                {% else %}-{% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="text-gray-500 italic">Belum ada data transaksi ditampilkan.</p>
+        {% endif %}
+    </div>
+</div>
+
+<div id="scannerModal" class="hidden fixed inset-0 z-50 bg-black bg-opacity-70 flex items-center justify-center p-4">
+    <div class="bg-white p-6 rounded-xl w-full max-w-md relative">
+        <button onclick="closeScanner()" class="absolute top-2 right-2 text-2xl text-gray-600">&times;</button>
+        <h3 class="text-lg font-semibold mb-3">📷 Scan Barcode</h3>
+        <select id="cameraSelect" class="border px-2 py-1 rounded-lg text-sm mb-3">
+            <option value="environment">📷 Kamera Belakang</option>
+            <option value="user">🤳 Kamera Depan</option>
+        </select>
+        <div id="reader" class="border rounded-lg shadow-inner w-full"></div>
+    </div>
+</div>
+
+<div id="productDetailModal" class="hidden fixed inset-0 z-50 bg-black bg-opacity-70 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl p-6 w-full max-w-lg relative">
+        <button onclick="closeProductModal()" class="absolute top-2 right-2 text-2xl text-gray-600">&times;</button>
+        <h3 class="text-2xl font-bold mb-4">Detail Produk & Transaksi</h3>
+        
+        <div id="loadingIndicator" class="text-center p-4 text-gray-500 hidden">Loading...</div>
+        <div id="errorIndicator" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative hidden"></div>
+        
+        <div id="productInfo" class="space-y-4 hidden">
+            <div class="grid grid-cols-2 gap-4 text-gray-700">
+                <p><strong>Jenis Gas:</strong> <span id="infoJenisGas"></span></p>
+                <p><strong>Berat:</strong> <span id="infoBerat"></span></p>
+                <p><strong>Harga:</strong> <span id="infoHarga"></span></p>
+                <p><strong>Stok:</strong> <span id="infoStok"></span></p>
+            </div>
+
+            <hr class="my-4">
+
+            <h4 class="text-xl font-semibold text-gray-700 mb-4">📝 Catat Transaksi</h4>
+            <form id="transaksiForm" action="{{ url_for('cek_penjualan.tambah_transaksi_manual') }}" method="POST" enctype="multipart/form-data" class="space-y-4">
+                <input type="hidden" id="gasIdInput" name="gas_id">
+                
+                <div>
+                    <label class="block text-gray-600">Nama Pelanggan</label>
+                    <input type="text" name="nama_pelanggan" required
+                           class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500">
+                </div>
+
+                <div>
+                    <label class="block text-gray-600">Alamat</label>
+                    <textarea name="alamat" required
+                              class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"></textarea>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-gray-600">Jumlah</label>
+                        <input type="number" id="jumlahInput" name="jumlah" min="1" value="1" required
+                               class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-gray-600">Tanggal Kirim</label>
+                        <input type="date" name="tgl_kirim"
+                               class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-gray-600">Upload Foto</label>
+                        <input type="file" name="foto" accept="image/*"
+                               class="w-full border border-gray-300 rounded-lg px-4 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-gray-600">Upload Video</label>
+                        <input type="file" name="video" accept="video/*"
+                               class="w-full border border-gray-300 rounded-lg px-4 py-2">
+                    </div>
+                </div>
+
+                <button type="submit"
+                        class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg shadow">
+                    Simpan Transaksi
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script src="https://unpkg.com/html5-qrcode"></script>
+<script>
+    let html5QrCode;
+    let currentCamera = "environment";
+    const productDetailModal = document.getElementById('productDetailModal');
+    const loadingIndicator = document.getElementById('loadingIndicator');
+    const errorIndicator = document.getElementById('errorIndicator');
+    const productInfoContainer = document.getElementById('productInfo');
+
+    function openScanner() {
+        document.getElementById("scannerModal").classList.remove("hidden");
+        if (!html5QrCode) {
+            html5QrCode = new Html5Qrcode("reader");
+        }
+        startCamera(currentCamera);
+    }
+
+    function startCamera(facingMode) {
+        currentCamera = facingMode;
+        const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+        const videoConstraints = { facingMode: facingMode };
+        
+        html5QrCode.start(
+            videoConstraints,
+            config,
+            qrCodeMessage => {
+                document.getElementById("barcodeInput").value = qrCodeMessage;
+                fetchProductDetails();
+                closeScanner();
+            },
+            errorMessage => {
+                // Ignore error messages, as they are normal during scanning
+            }
+        ).catch(err => console.error("Camera start error:", err));
+    }
+
+    function closeScanner() {
+        document.getElementById("scannerModal").classList.add("hidden");
+        if (html5QrCode && html5QrCode.isScanning) {
+            html5QrCode.stop().catch(err => console.error("Stop scan error:", err));
+        }
+    }
+
+    document.getElementById("cameraSelect").addEventListener("change", function() {
+        if (html5QrCode && html5QrCode.isScanning) {
+            html5QrCode.stop().then(() => {
+                startCamera(this.value);
+            }).catch(err => console.error("Restart camera error:", err));
+        }
+    });
+
+    function closeProductModal() {
+        productDetailModal.classList.add('hidden');
+    }
+
+    async function fetchProductDetails() {
+        const barcode = document.getElementById('barcodeInput').value;
+        if (!barcode) {
+            alert('Mohon masukkan kode barcode atau scan terlebih dahulu.');
+            return;
+        }
+
+        loadingIndicator.classList.remove('hidden');
+        errorIndicator.classList.add('hidden');
+        productInfoContainer.classList.add('hidden');
+        productDetailModal.classList.remove('hidden');
+
+        try {
+            const response = await fetch(`/cek_penjualan/api/gas_by_barcode/${barcode}`);
+            const data = await response.json();
+
+            loadingIndicator.classList.add('hidden');
+
+            if (response.ok && data.success) {
+                const gas = data.gas;
+                document.getElementById('infoJenisGas').innerText = gas.jenis_gas;
+                document.getElementById('infoBerat').innerText = gas.berat;
+                document.getElementById('infoHarga').innerText = `Rp ${Number(gas.harga).toLocaleString('id-ID')}`;
+                document.getElementById('infoStok').innerText = `${gas.stok} buah`;
+                document.getElementById('gasIdInput').value = gas.id;
+                document.getElementById('jumlahInput').max = gas.stok;
+
+                productInfoContainer.classList.remove('hidden');
+            } else {
+                errorIndicator.innerText = data.message || 'Produk tidak ditemukan.';
+                errorIndicator.classList.remove('hidden');
+            }
+        } catch (error) {
+            loadingIndicator.classList.add('hidden');
+            errorIndicator.innerText = 'Terjadi kesalahan saat mengambil data.';
+            errorIndicator.classList.remove('hidden');
+            console.error('Fetch error:', error);
+        }
+    }
+    
+    // Handle form submission inside the modal
+    document.getElementById('transaksiForm').addEventListener('submit', async function(event) {
+        event.preventDefault();
+        
+        const form = event.target;
+        const formData = new FormData(form);
+        const jumlah = parseInt(formData.get('jumlah'));
+
+        const currentStokText = document.getElementById('infoStok').innerText;
+        const currentStok = parseInt(currentStokText.split(' ')[0]);
+
+        if (jumlah > currentStok) {
+            alert('Jumlah yang dimasukkan melebihi stok yang tersedia.');
+            return;
+        }
+
+        try {
+            const response = await fetch(form.action, {
+                method: 'POST',
+                body: formData
+            });
+            const result = await response.json();
+            
+            if (result.success) {
+                alert('Transaksi berhasil disimpan!');
+                closeProductModal();
+                window.location.reload(); // Reload to show updated transaction history
+            } else {
+                alert(`Gagal menyimpan transaksi: ${result.message}`);
+            }
+        } catch (error) {
+            alert('Terjadi kesalahan saat memproses transaksi.');
+            console.error('Submit error:', error);
+        }
+    });
+</script>
+{% endblock %}

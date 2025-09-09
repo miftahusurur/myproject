@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cetak Semua Barcode</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Sembunyikan tombol saat dicetak */
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+        }
+        /* Styling untuk item barcode */
+        .barcode-item {
+            display: inline-block;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin: 10px;
+            text-align: center;
+            width: 250px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .barcode-item img {
+            max-width: 100%;
+            height: auto;
+            margin-bottom: 5px;
+        }
+        .barcode-item h4 {
+            margin: 0;
+            font-size: 14px;
+        }
+        .barcode-item p {
+            margin: 0;
+            font-size: 12px;
+            color: #555;
+        }
+    </style>
+</head>
+<body class="p-4">
+
+    <div class="no-print text-center mb-4">
+        <h1 class="text-2xl font-bold">Halaman Cetak Barcode</h1>
+        <p class="text-gray-600">Tekan tombol di bawah untuk mencetak</p>
+        <button onclick="window.print()" class="mt-4 px-6 py-2 bg-blue-600 text-white rounded-md shadow-md hover:bg-blue-700">
+            Cetak Halaman Ini
+        </button>
+    </div>
+
+    <div class="print-area flex flex-wrap justify-center">
+        {% for gas in gas_list %}
+        <div class="barcode-item">
+            <img src="{{ url_for('static', filename='barcodes/' + gas.barcode) }}" alt="Barcode {{ gas.jenis_gas }}">
+            <h4>{{ gas.jenis_gas }} - {{ gas.berat }} kg</h4>
+            <p>Kode: {{ gas.barcode.replace('.png', '') }}</p>
+        </div>
+        {% endfor %}
+    </div>
+
+</body>
+</html>

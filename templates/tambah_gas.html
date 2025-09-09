@@ -1,0 +1,231 @@
+{% extends 'base.html' %} 
+
+{% block title %}Tambah Stok Gas{% endblock %}
+
+{% block head %}
+{{ super() }}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+{% endblock %}
+
+{% block content %}
+<div class="bg-white p-6 sm:p-8 rounded-lg shadow-xl w-full max-w-7xl mx-auto">
+    <div class="flex flex-col sm:flex-row justify-between items-center mb-6 gap-3">
+        <h2 class="text-2xl sm:text-3xl font-bold text-gray-800">Tambah Stok Gas</h2>
+        <a href="{{ url_for('index') }}" 
+           class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md shadow-sm text-white bg-gray-600 hover:bg-gray-700">
+            <i class="bi bi-arrow-left-circle mr-2"></i> Kembali ke Dashboard
+        </a>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        <div class="space-y-2 mb-4">
+            {% for category, message in messages %}
+                <div class="{% if category == 'error' %}bg-red-100 border border-red-400 text-red-700{% elif category == 'success' %}bg-green-100 border border-green-400 text-green-700{% endif %} px-4 py-3 rounded relative text-sm">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+    {% endwith %}
+
+    <div class="mb-8">
+        <h3 class="text-xl sm:text-2xl font-semibold text-gray-700 mb-4">Tambah Gas Baru</h3>
+        <form action="{{ url_for('tambah_gas.tambah_gas') }}" method="post" enctype="multipart/form-data"
+              class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+            
+            <div>
+                <label for="jenis_gas" class="block text-sm font-medium text-gray-700">Jenis Gas</label>
+                <input type="text" id="jenis_gas" name="jenis_gas" required
+                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+            </div>
+            <div>
+                <label for="berat" class="block text-sm font-medium text-gray-700">Berat</label>
+                <input type="text" id="berat" name="berat" required
+                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+            </div>
+
+            <div>
+                <label for="harga" class="block text-sm font-medium text-gray-700">Harga (Rp)</label>
+                <input type="number" id="harga" name="harga" min="0" step="1000" required
+                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+            </div>
+            <div>
+                <label for="stok" class="block text-sm font-medium text-gray-700">Stok</label>
+                <input type="number" id="stok" name="stok" min="0" required
+                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+            </div>
+
+            <div>
+                <label for="tanggal_masuk" class="block text-sm font-medium text-gray-700">Tanggal Masuk</label>
+                <input type="date" id="tanggal_masuk" name="tanggal_masuk" required
+                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+            </div>
+            <div>
+                <label for="gambar" class="block text-sm font-medium text-gray-700">Gambar Produk</label>
+                <input type="file" id="gambar" name="gambar" accept="image/*"
+                       class="mt-1 block w-full text-gray-900 border-gray-300 rounded-md shadow-sm cursor-pointer bg-white focus:outline-none sm:text-sm">
+            </div>
+
+            <div class="md:col-span-2">
+                <label for="barcode" class="block text-sm font-medium text-gray-700">Barcode</label>
+                <input type="text" id="barcodeInput" name="barcode" readonly
+                       class="mt-1 block w-full rounded-md border-gray-300 bg-gray-100 shadow-sm sm:text-sm">
+                <svg id="barcodeSvg" class="mt-2 w-full max-w-xs"></svg>
+            </div>
+
+            <div class="md:col-span-2">
+                <button type="submit"
+                        class="w-full flex justify-center py-2 px-4 rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700">
+                    Tambah Gas
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <div>
+        <div class="flex flex-col sm:flex-row justify-between items-center mb-4 gap-3">
+            <h3 class="text-xl sm:text-2xl font-semibold text-gray-700">Daftar Stok Gas</h3>
+            <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                <input type="text" id="searchInput"
+                       placeholder="Cari data..." 
+                       class="w-full sm:w-64 px-3 py-2 border rounded-md text-sm focus:ring-blue-500 focus:border-blue-500">
+                
+                <button onclick="cetakBarcode()"
+                        class="px-4 py-2 text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 text-center">
+                    Cetak Semua Barcode
+                </button>
+            </div>
+        </div>
+        <div class="overflow-x-auto">
+            <table id="gasTable" class="min-w-full divide-y divide-gray-200 text-sm">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase">Gambar</th>
+                        <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase">Tanggal</th>
+                        <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase">Jenis Gas</th>
+                        <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase">Harga</th>
+                        <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase">Stok</th>
+                        <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase">Barcode</th>
+                        <th class="px-3 py-2 text-left font-medium text-gray-500 uppercase">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    {% for gas in gas_list %}
+                    <tr>
+                        <td class="px-3 py-2">
+                            {% if gas.gambar %}
+                                <img src="{{ url_for('static', filename='uploads/' + gas.gambar) }}"
+                                     class="w-12 h-12 sm:w-16 sm:h-16 object-cover rounded-md">
+                            {% else %}
+                                <div class="w-12 h-12 sm:w-16 sm:h-16 bg-gray-200 flex items-center justify-center rounded-md text-xs text-gray-500">No Img</div>
+                            {% endif %}
+                        </td>
+                        <td class="px-3 py-2">{{ gas.tanggal_masuk }}</td>
+                        <td class="px-3 py-2">{{ gas.jenis_gas }}</td>
+                        <td class="px-3 py-2">Rp {{ "{:,.0f}".format(gas.harga).replace(",", ".") }}</td>
+                        <td class="px-3 py-2">{{ gas.stok }}</td>
+                        
+                        <td class="px-3 py-2">
+                            <div class="flex flex-col items-center">
+                                <img src="{{ url_for('static', filename='barcodes/' + gas.barcode) }}"
+                                     alt="Barcode {{ gas.jenis_gas }}" 
+                                     class="h-10 w-auto">
+                                <span class="mt-1 text-xs font-mono text-gray-600">{{ gas.barcode.replace('.png', '') }}</span>
+                            </div>
+                        </td>
+                        
+                        <td class="px-3 py-2 flex flex-col sm:flex-row gap-2">
+                            <button onclick="generateQRCode('{{ gas.id }}','{{ gas.jenis_gas }}','{{ gas.harga }}','{{ gas.stok }}')"
+                                    class="text-blue-600 hover:text-blue-900 flex items-center gap-1">
+                                QR <i class="bi bi-qr-code-scan"></i>
+                            </button>
+                            <form action="{{ url_for('tambah_gas.hapus_gas', id=gas.id) }}" method="post"
+                                  onsubmit="return confirm('Yakin hapus data ini?');">
+                                <button type="submit" class="text-red-600 hover:text-red-900 flex items-center gap-1">
+                                    Hapus <i class="bi bi-trash-fill"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="px-3 py-4 text-center text-gray-500">Tidak ada data gas.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div id="qrModal" class="hidden fixed inset-0 z-50 bg-gray-800 bg-opacity-75 flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg p-6 max-w-sm w-full relative text-center">
+        <button id="closeModal" class="absolute top-2 right-2 text-gray-600 hover:text-gray-900 text-2xl">&times;</button>
+        <h3 class="text-xl font-bold mb-4">QR Code Produk</h3>
+        <div id="qrcode" class="flex justify-center mb-4"></div>
+        <button onclick="window.print()" 
+                class="w-full py-2 px-4 rounded-md text-sm font-medium text-white bg-blue-600 hover:bg-blue-700">
+            Cetak
+        </button>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+
+<script>
+    const modal = document.getElementById('qrModal');
+    const closeModalButton = document.getElementById('closeModal');
+
+    function generateQRCode(id, jenis, harga, stok) {
+        const data = JSON.stringify({ id, jenis, harga, stok });
+        const qrcodeContainer = document.getElementById('qrcode');
+        qrcodeContainer.innerHTML = '';
+        new QRCode(qrcodeContainer, { text: data, width: 200, height: 200 });
+        modal.classList.remove('hidden');
+    }
+    closeModalButton.onclick = () => modal.classList.add('hidden');
+    window.onclick = (e) => { if (e.target == modal) modal.classList.add('hidden'); };
+
+    // Barcode otomatis di form
+    function generateBarcode() {
+        const jenisGasInput = document.querySelector("#jenis_gas").value;
+        const jenisGas = jenisGasInput.toUpperCase().replace(/\s/g, ''); // Menghapus spasi dan mengubah ke uppercase
+        const tahun = new Date().getFullYear();
+        const kodeNegara = "IDN";
+        const nomorAcak = Math.floor(10000 + Math.random() * 90000);
+        const barcode = `${jenisGas}-` + kodeNegara + tahun + "-" + nomorAcak;
+        document.getElementById("barcodeInput").value = barcode;
+        JsBarcode("#barcodeSvg", barcode, { format: "CODE128", height: 30, width: 1.2, displayValue: true, fontSize: 10 });
+    }
+
+    // Pencarian realtime
+    document.getElementById("searchInput").addEventListener("keyup", function() {
+        const filter = this.value.toLowerCase();
+        const rows = document.querySelectorAll("#gasTable tbody tr");
+        rows.forEach(row => {
+            const text = row.innerText.toLowerCase();
+            row.style.display = text.includes(filter) ? "" : "none";
+        });
+    });
+
+    window.addEventListener("DOMContentLoaded", () => {
+        generateBarcode();
+    });
+    document.querySelector("#jenis_gas").addEventListener("input", generateBarcode);
+    
+    // Fungsi untuk mencetak semua barcode
+    function cetakBarcode() {
+        const url = "{{ url_for('tambah_gas.cetak_semua_barcode') }}";
+        const printWindow = window.open(url, '_blank', 'width=800,height=600');
+        
+        if (printWindow) {
+            printWindow.onload = () => {
+                printWindow.focus();
+                printWindow.print();
+            };
+        }
+    }
+</script>
+{% endblock %}
